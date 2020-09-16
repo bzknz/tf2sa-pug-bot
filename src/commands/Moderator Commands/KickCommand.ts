@@ -1,11 +1,7 @@
 //Seems to be working as intended
 
-//TODO ADD REGEX
-
 import {Command} from "discord-akairo";
 import {Message} from "discord.js";
-import { Player } from "../../models/Player";
-import { GuildMember } from "discord.js";
 
 export default class KickCommand extends Command {
     public constructor() {
@@ -32,18 +28,8 @@ export default class KickCommand extends Command {
         });
     }
 
-    public exec(message: Message, {member} : {member: string}): Promise<Message> {    
-
-        if (!this.client.pug == null)
-            return message.util.send("There is no pug in progress.")
-        switch (this.client.pug.kickPlayer(name)) {
-            case 0:
-                return this.client.displayReadyStatus(message);
-            case 1:
-                return message.util.send("No player found matching that name.")
-            case 2: 
-                return message.util.send("Multiple matching players found")
-        }
+    public exec(message: Message, {member} : {member: string}): Promise<Message> {
+        return this.client.pugControl.kickPlayer(member);  //Need to double check
     }
 
 }

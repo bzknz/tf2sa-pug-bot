@@ -19,17 +19,6 @@ export default class StatusCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-
-        if (this.client.mapList.length === 0)
-            return message.util.send("There is no maps available.");
-
-        let output: String = "Maps: ";
-        let nrMaps: number = this.client.mapList.length;
-        for (let i = 0; i < nrMaps-1; i++) {
-            output = output.concat(this.client.mapList[i]).concat(", ");
-        }
-        output = output.concat(this.client.mapList[nrMaps-1]);
-
-        return message.util.send(output);
+        return this.client.pugControl.displayMapList();  //Working as intended
     }
 }

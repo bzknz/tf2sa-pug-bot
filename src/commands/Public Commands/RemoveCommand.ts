@@ -19,13 +19,6 @@ export default class RemoveCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-        if (this.client.pug == null) {
-            return message.util.send("There is no pug in progress.");
-        }
-
-        if (this.client.pug.removePlayer(message.member.displayName))
-            return this.client.displayReadyStatus(message);
-
-        return message.util.send("You are not added to the pug.") 
+        return this.client.pugControl.removePlayer(message.member.id);
     }
 }

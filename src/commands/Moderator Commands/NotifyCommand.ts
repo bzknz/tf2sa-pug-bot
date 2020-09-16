@@ -22,6 +22,6 @@ export default class NotifyCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-        return this.client.notifySubscribers(message, "A pug is in progress.");
+        return this.client.pugControl.notifySubscribers("A pug is in progress.");  //Need to check, add controls
     }
 }

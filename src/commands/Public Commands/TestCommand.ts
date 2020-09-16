@@ -32,18 +32,11 @@ export default class TestCommand extends Command {
     */
 
    public async exec(message: Message): Promise<Message> {
-    let returnString: String = "";
+       setInterval(() => {
+           message.util.send("Dummy message: " + new Date().getTime());
+        },
+        1000);
 
-     await SSQuery.getPlayers("197.80.200.70", 27035)
-        .then((info) => {
-            let playerNames: String = "";
-            info.forEach(element => {
-                playerNames = playerNames.concat(element.name).concat("\n");
-            });
-            returnString = `Player count: ${info.length}, ${playerNames}`
-        })
-        .catch(() => returnString = "Unable to retrieve player info from the server" )    
-
-    return message.util.send(returnString);
-}
+        return message.util.send("test");
+    }
 }

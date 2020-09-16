@@ -19,7 +19,7 @@ export default class StatusCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-        let output: String = "\`\`\`\nList of bots commands: \n\n";
+        let output: String = "\`\`\`\nList of bots commands: \n\n";  //Working as intended
         this.client.commandHandler.modules.forEach((c, k, m) => {
             let comm: Command = m.get(k);
             if (comm.categoryID =="Public Commands") {

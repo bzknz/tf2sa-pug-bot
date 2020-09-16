@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "npm run build && node dist/Bot.js",
+    "dev": "ts-node-dev --respawn --transpile-only ./src/Bot.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +19,8 @@
     "dotenv": "^8.2.0",
     "rcon-srcds": "^1.2.1",
     "source-server-query": "^1.0.1"
+  },
+  "devDependencies": {
+    "ts-node-dev": "^1.0.0-pre.62"
   }
 }

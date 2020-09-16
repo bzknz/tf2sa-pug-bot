@@ -14,19 +14,18 @@ export default class ReadyCommand extends Command {
                     "ready"
                 ]
             },
+            args: [
+                {
+                    id: "duration",
+                    type: "number",
+                    default: "5"
+                }],
             channel: 'guild',
             ratelimit: 3
         });
     }
 
-    public exec(message: Message): Promise<Message> {
-        if (this.client.pug == null || !this.client.pug.isAdded(message.member.displayName)) {
-            console.log("test");
-            return null;
-        }
-        let temp: Player = this.client.pug.getPlayer(message.member.displayName);
-        console.log(temp.discordMember.displayName);
-        temp.updateReady();
-        return message.util.send(`${message.member.displayName} will be ready for the next ${this.client.readyDuration/6e4} minutes`);
+    public exec(message: Message, {duration} : {duration: number}): Promise<Message> {
+        return this.client.pugControl.readyPlayer(message.member.id, duration);
     }
 }

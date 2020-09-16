@@ -20,15 +20,6 @@ export default class StartCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-        if (this.client.pug != null)
-            return message.util.send("A pug is already in progress");
-        this.client.startPug(message)
-        .then(() => {
-            message.util.send("Started a pug.");
-            return this.client.displayReadyStatus(message);
-        })
-        .catch(() => {
-            return message.util.send("Cannot start a game, no open servers to use.");
-        });
+        return this.client.pugControl.startPug(message);
     }
 }

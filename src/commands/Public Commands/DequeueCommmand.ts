@@ -4,14 +4,14 @@ import { Player } from "../../models/Player";
 
 export default class AddCommand extends Command {
     public constructor() {
-        super("q", {
-            aliases: ["q"],
+        super("dq", {
+            aliases: ["dq"],
             category: "Public Commands",
             description: {
-                content: "Add a player to a queue, waiting for a new pug to be started.",
-                usage: "q",
+                content: "Removes a player from a queue.",
+                usage: "dq",
                 examples: [
-                    "q"
+                    "dq"
                 ]
             },
             channel: 'guild',
@@ -20,6 +20,6 @@ export default class AddCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-        return this.client.pugControl.queuePlayer(message.member); //Working as intended
+        return this.client.pugControl.dequeuePlayer(message.member.id);  //Working as intended
     }
 }

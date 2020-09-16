@@ -40,6 +40,22 @@ export class PugQueue {
         return false;
     }
 
+    public removePlayerID(id: string): boolean {
+        let addedPlayer: QueuedPlayer = null;
+        this.queue.forEach(p => {
+            if (p.player.discordMember.id === id)
+                addedPlayer = p;
+        });
+
+        if (addedPlayer != null) {
+            this.queue = this.queue.filter( function(value, index, arr) {
+                return value.player.discordMember.id != id;
+            })
+            return true;
+        }
+        return false;
+    }
+
     public dequeue(): QueuedPlayer {
         if (this.queue.length == 0)
             return null;
@@ -51,6 +67,16 @@ export class PugQueue {
         player = this.queue[0];
         this.queue = temp;
         return player;
+    }
+
+    public getLength(): number {
+        return this.queue.length;
+    }
+
+    public getPlayer(index: number): QueuedPlayer {
+        if (index > this.queue.length || index < 0)
+            return null;
+        return this.queue[index];
     }
 }
 

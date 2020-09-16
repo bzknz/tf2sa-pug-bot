@@ -19,11 +19,6 @@ export default class StatusCommand extends Command {
     }
 
     public exec(message: Message): Promise<Message> {
-
-        if (this.client.pug == null) {
-            message.util.send("There is no pug in progress.");    
-            return this.client.displayQueue(message);
-        }
-        this.client.displayReadyStatus(message);
+        return this.client.pugControl.displayStatus();
     }
 }
