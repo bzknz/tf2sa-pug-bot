@@ -189,7 +189,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
 
   public displayMapList(): Promise<Message> {
     if (this.mapList.length === 0)
-      return this.context.channel.send("There is no maps available.");
+      return this.context.channel.send("There are no maps available.");
 
     let output: String = "Maps: ";
     let nrMaps: number = this.mapList.length;

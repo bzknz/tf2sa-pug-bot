@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm run clean && tsc",
-    "clean": "rm -r ./dist/*",
+    "build": "npm run clean && cp ./src/.env ./dist/ && tsc",
+    "clean": "rm -r ./dist && mkdir -p ./dist",
     "dev": "ts-node-dev --respawn --transpile-only ./src/Bot.ts",
     "start": "npm run build && node dist/Bot.js"
   },
