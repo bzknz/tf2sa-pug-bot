@@ -1,25 +1,22 @@
-import {Command} from "discord-akairo";
-import {Message} from "discord.js";
-import { SSQuery } from "../../util/SSQuery";
+import { Command } from "discord-akairo";
+import { Message } from "discord.js";
 
 export default class TestCommand extends Command {
-    constructor() {
-        super('testinfo', {
-            aliases: ['testinfo'],
-            category: "Test Commands",
-            description: {
-                content: "Test a player to an existing pickup",
-                usage: "test",
-                examples: [
-                    "test"
-                ]
-            },
-            channel: 'guild',
-            ratelimit: 3
-        });
-    }
+  constructor() {
+    super("testinfo", {
+      aliases: ["testinfo"],
+      category: "Test Commands",
+      description: {
+        content: "Test a player to an existing pickup",
+        usage: "test",
+        examples: ["test"],
+      },
+      channel: "guild",
+      ratelimit: 3,
+    });
+  }
 
-    /*
+  /*
     public async exec(message: Message): Promise<Message> {
         let returnString: String = "";
 
@@ -31,12 +28,11 @@ export default class TestCommand extends Command {
     }
     */
 
-   public async exec(message: Message): Promise<Message> {
-       setInterval(() => {
-           message.util.send("Dummy message: " + new Date().getTime());
-        },
-        1000);
+  public async exec(message: Message): Promise<Message> {
+    setInterval(() => {
+      message.util.send("Dummy message: " + new Date().getTime());
+    }, 1000);
 
-        return message.util.send("test");
-    }
+    return message.util.send("test");
+  }
 }

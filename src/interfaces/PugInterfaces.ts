@@ -1,10 +1,9 @@
-import {Message} from "discord.js";
-import {Player} from "../models/Player"
+import { Player } from "../models/Player";
 
 export interface IPug {
-    onPugStop();
+  onPugStop();
 
-    onPlayerAdded(player: Player);
+  onPlayerAdded(player: Player);
 
-    onPlayerRemoved(player: Player);
+  onPlayerRemoved(player: Player);
 }
