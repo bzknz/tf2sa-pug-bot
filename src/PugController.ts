@@ -19,11 +19,11 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   checkReadyInterval: NodeJS.Timeout;
   readyTimeout: NodeJS.Timeout;
 
-  maxPlayers: number = 12;
-  readyDuration = 5;
-  queueDuration = 3.6e6; //1 Hour maximum limit in queue
-  minReadyDuration: number = 5;
-  maxReadyDuration: number = 15;
+  maxPlayers = 12;
+  readyDuration = 15;
+  queueDuration = 3.6e6; // 1 Hour maximum limit in queue
+  minReadyDuration = 15;
+  maxReadyDuration = 30;
   rconPassword: string = process.env.RCON_PASSWORD;
 
   constructor() {
