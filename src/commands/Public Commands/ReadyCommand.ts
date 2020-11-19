@@ -15,7 +15,7 @@ export default class ReadyCommand extends Command {
         {
           id: "duration",
           type: "number",
-          default: "5",
+          default: "15",
         },
       ],
       channel: "guild",
@@ -27,6 +27,9 @@ export default class ReadyCommand extends Command {
     message: Message,
     { duration }: { duration: number }
   ): Promise<Message> {
-    return this.client.pugControl.readyPlayer(message.member.id, duration);
+    return this.client.pugControl.readyPlayer(
+      message.member.id,
+      Math.round(duration)
+    );
   }
 }
