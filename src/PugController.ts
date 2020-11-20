@@ -228,10 +228,9 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   public vacateServer(serverID: number): Promise<Message> {
-    let returnString: String = "No server found matching that ID";
-    let currServer: TF2Server = this.serverList[serverID];
+    const currServer = this.serverList[serverID];
     if (currServer != null) {
-      let rcon = new RconConnection(
+      const rcon = new RconConnection(
         currServer.address,
         currServer.port,
         this.rconPassword
@@ -248,8 +247,9 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
             "Unable to kick players from the server"
           );
         });
+    } else {
+      return this.context.channel.send("No server found matching that ID");
     }
-    return this.context.channel.send(returnString);
   }
 
   public readyPlayer(id: string, duration: number) {
