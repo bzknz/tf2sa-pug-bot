@@ -26,6 +26,6 @@ export default class ChangeMapCommand extends Command {
   }
 
   public exec(message: Message, { map }: { map: string }): Promise<Message> {
-    return this.client.pugControl.changeMap(map); //Working as intended
+    return this.client.pugControl.changeMap(message, map);
   }
 }

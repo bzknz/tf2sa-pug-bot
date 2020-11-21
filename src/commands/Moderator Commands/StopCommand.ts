@@ -18,6 +18,6 @@ export default class StopCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.stopPug(); //Working as intended
+    return this.client.pugControl.stopPug(message);
   }
 }

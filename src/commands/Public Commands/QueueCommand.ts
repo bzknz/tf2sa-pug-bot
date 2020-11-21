@@ -18,6 +18,6 @@ export default class AddCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.queuePlayer(message.member); //Working as intended
+    return this.client.pugControl.queuePlayer(message);
   }
 }

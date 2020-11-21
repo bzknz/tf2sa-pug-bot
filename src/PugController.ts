@@ -1,4 +1,4 @@
-import { GuildMember, Message } from "discord.js";
+import { Message } from "discord.js";
 import { IPug } from "./interfaces/PugInterfaces";
 import { IServerFull, IServerUnfull } from "./interfaces/ServerInterfaces";
 import { Player } from "./models/Player";
@@ -11,7 +11,6 @@ import { SSQuery } from "./util/SSQuery";
 export class PugController implements IServerFull, IServerUnfull, IPug {
   pug: Pug;
   pugQueue: PugQueue;
-  context: Message;
 
   serverList: TF2Server[] = [];
   mapList: string[] = [];
@@ -33,9 +32,9 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   private loadServers() {
-    let servers: string[] = process.env.SERVER_LIST.split(",");
+    const servers = process.env.SERVER_LIST.split(",");
     servers.forEach((s) => {
-      let info: string[] = s.split(":");
+      const info = s.split(":");
       this.serverList.push(new TF2Server(info[0], parseInt(info[1]), "games"));
     });
   }
@@ -45,18 +44,24 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   private getRandomMap(): string {
-    let index: number = Math.floor(Math.random() * this.mapList.length);
+    const index = Math.floor(Math.random() * this.mapList.length);
     return this.mapList[index];
   }
 
-  public notifySubscribers(msg: string): Promise<Message> {
-    const role = this.context.guild.roles.cache.find(
+  public notifySubscribers(message: Message, msg: string): Promise<Message> {
+    const role = message.guild.roles.cache.find(
       (role) => role.name === "pug-notification"
     );
-    return this.context.channel.send(`<@&${role.id}> ${msg}`);
+    if (role) {
+      return message.channel.send(`<@&${role.id}> ${msg}`);
+    } else {
+      return message.channel.send(
+        `Error: could not find pug-notification role.`
+      );
+    }
   }
 
-  private displayReadyStatus(): Promise<Message> {
+  private displayReadyStatus(message: Message): Promise<Message> {
     let output: string = "(";
     let currentTime: number = new Date().getTime();
     for (let i = 0; i < this.maxPlayers; i++) {
@@ -73,10 +78,10 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     }
     output = output.slice(0, -3);
     let finalOutput: string = `\`\`\`\n (${this.pug.currentMap}) [${this.pug.addedPlayers.length}/${this.maxPlayers}] Players: [${output}] \`\`\``;
-    return this.context.channel.send(finalOutput);
+    return message.channel.send(finalOutput);
   }
 
-  public displayQueue(): Promise<Message> {
+  public displayQueue(message: Message): Promise<Message> {
     let output: string = "(";
     for (let i = 0; i < this.pugQueue.getLength(); i++) {
       output = output
@@ -85,14 +90,15 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     }
     output = output.slice(0, -3);
     let finalOutput: string = `\`\`\`\n Players in queue: [${output}] \`\`\``;
-    return this.context.channel.send(finalOutput);
+    return message.channel.send(finalOutput);
   }
 
-  public startPug(context: Message): Promise<Message> {
-    if (this.pug != null)
-      return this.context.channel.send("A pug is already in progress");
-    this.context = context;
-    this.clearInputRoles()
+  public startPug(message: Message): Promise<Message> {
+    if (this.pug != null) {
+      return message.channel.send("A PUG is already in progress.");
+    }
+
+    this.clearInputRoles(message)
       .then(() => this.checkAvailableServers())
       .then(
         (openServers) =>
@@ -115,81 +121,78 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
               for (let i = 0; i < iterations; i++) {
                 let queuedPlayer = this.pugQueue.dequeue();
                 if (queuedPlayer.timeInQueue() < this.queueDuration)
-                  this.pug.addPlayer(queuedPlayer.player);
+                  this.pug.addPlayer(message, queuedPlayer.player);
               }
               resolve();
             }
           })
       )
-      .then(() => this.notifySubscribers("A new pug has been started."))
+      .then(() =>
+        this.notifySubscribers(message, "A new pug has been started.")
+      )
       .then(() => {
-        return this.displayReadyStatus();
+        return this.displayReadyStatus(message);
       })
-      .catch(() => {
-        return this.context.channel.send(
+      .catch((e) => {
+        console.error(e);
+        return message.channel.send(
           "Cannot start a game, no open servers to use."
         );
       });
   }
 
-  public stopPug(): Promise<Message> {
-    if (this.pug == null)
-      return this.context.channel.send("There is no pug in progress");
-    this.pug.stop();
-    return this.context.channel.send("Stopped the pug.");
-  }
-
-  public addPlayer(member: GuildMember): Promise<Message> {
-    if (this.pug == null)
-      return this.context.channel.send("There is no pug in progress.");
-    if (this.pug.isFull())
-      return this.context.channel.send(
-        "The pug is currently full, wait until a new one has been created."
-      );
-    if (this.pug.addPlayer(new Player(member)))
-      return this.displayReadyStatus();
-    return this.context.channel.send("Already added to the pug.");
-  }
-
-  public addPlayerID(id: string): Promise<Message> {
-    return new Promise((resolve, reject) => {
-      this.context.guild.members.fetch().then((members) => {
-        let member: GuildMember = null;
-        members.forEach((m) => {
-          if (m.id === id) member = m;
-        });
-        if (member != null) resolve(this.addPlayer(member));
-        else
-          resolve(
-            this.context.channel.send(`No player found with the ID: ${id}`)
-          );
-      });
-    });
-  }
-
-  public removePlayer(id: string): Promise<Message> {
-    if (this.pug == null)
-      return this.context.channel.send("There is no pug in progress.");
-    if (this.pug.removePlayer(id)) return this.displayReadyStatus();
-    else return this.context.channel.send("You are not added to the pug.");
-  }
-
-  public kickPlayer(name: string): Promise<Message> {
-    if (!this.pug == null)
-      return this.context.channel.send("There is no pug in progress.");
-    switch (this.pug.removePlayerRegex(name)) {
-      case 0:
-        return this.displayReadyStatus();
-      case 1:
-        return this.context.channel.send("No player found matching that name.");
-      case 2:
-        return this.context.channel.send("Multiple matching players found");
+  public stopPug(message: Message): Promise<Message> {
+    if (this.pug == null) {
+      return message.channel.send("There is no pug in progress");
+    } else {
+      this.pug.stop(message);
+      return message.channel.send("Stopped the pug.");
     }
   }
 
-  public displayMapList(): Promise<Message> {
-    if (this.mapList.length === 0)
-      return this.context.channel.send("There are no maps available.");
+  public addPlayer(message: Message): Promise<Message> {
+    const member = message.member;
+    if (this.pug == null) {
+      return message.channel.send("There is no pug in progress.");
+    } else if (this.pug.isFull()) {
+      return message.channel.send(
+        "The pug is currently full, wait until a new one has been created."
+      );
+    } else if (this.pug.addPlayer(message, new Player(member))) {
+      return this.displayReadyStatus(message);
+    } else {
+      return message.channel.send("Already added to the pug.");
+    }
+  }
+
+  public removePlayer(message: Message, id: string): Promise<Message> {
+    if (this.pug == null) {
+      return message.channel.send("There is no pug in progress.");
+    } else if (this.pug.removePlayer(message, id)) {
+      return this.displayReadyStatus(message);
+    } else {
+      return message.channel.send("You are not added to the pug.");
+    }
+  }
+
+  public kickPlayer(message: Message, name: string): Promise<Message> {
+    if (!this.pug == null) {
+      return message.channel.send("There is no pug in progress.");
+    }
+    switch (this.pug.removePlayerRegex(message, name)) {
+      case 0:
+        return this.displayReadyStatus(message);
+      case 1:
+        return message.channel.send("No player found matching that name.");
+      case 2:
+        return message.channel.send("Multiple matching players found");
+    }
+  }
+
+  public displayMapList(message: Message): Promise<Message> {
+    if (this.mapList.length === 0) {
+      return message.channel.send("There are no maps available.");
+    }
 
     let output: String = "Maps: ";
     let nrMaps: number = this.mapList.length;
@@ -197,25 +200,26 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
       output = output.concat(this.mapList[i]).concat(", ");
     }
     output = output.concat(this.mapList[nrMaps - 1]);
-    return this.context.channel.send(output);
+    return message.channel.send(output);
   }
 
-  public changeMap(map: string): Promise<Message> {
-    if (!this.pug == null)
-      return this.context.channel.send("There is no pug in progress.");
+  public changeMap(message: Message, map: string): Promise<Message> {
+    if (!this.pug == null) {
+      return message.channel.send("There is no pug in progress.");
+    }
 
-    let contains: string[] = [];
+    const contains: string[] = [];
     this.mapList.forEach((m) => {
       if (m.indexOf(map) !== -1) contains.push(m);
     });
 
     if (contains.length === 0) {
-      return this.context.channel.send("No matching maps found.");
+      return message.channel.send("No matching maps found.");
     }
 
     if (contains.length === 1) {
       this.pug.currentMap = contains[0];
-      return this.displayReadyStatus();
+      return this.displayReadyStatus(message);
     }
 
     let output: string = "Multiple maps found: [";
@@ -224,10 +228,10 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
       output = output.concat(contains[i]).concat(", ");
     }
     output = output.concat(contains[nrMaps - 1]).concat("]");
-    return this.context.channel.send(output);
+    return message.channel.send(output);
   }
 
-  public vacateServer(serverID: number): Promise<Message> {
+  public vacateServer(message: Message, serverID: number): Promise<Message> {
     const currServer = this.serverList[serverID];
     if (currServer != null) {
       const rcon = new RconConnection(
@@ -238,91 +242,126 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
       rcon
         .sendCommand("kickall")
         .then(() => {
-          return this.context.channel.send(
-            "All players kicked from the server"
-          );
+          return message.channel.send("All players kicked from the server.");
         })
         .catch(() => {
-          return this.context.channel.send(
-            "Unable to kick players from the server"
+          return message.channel.send(
+            "Unable to kick players from the server."
           );
         });
     } else {
-      return this.context.channel.send("No server found matching that ID");
+      return message.channel.send("No server found matching that ID.");
     }
   }
 
-  public readyPlayer(id: string, duration: number) {
+  public readyPlayer(message: Message, id: string, duration: number) {
     let validDuration =
       duration > this.maxReadyDuration ? this.maxReadyDuration : duration;
-    if (validDuration < this.minReadyDuration)
+    if (validDuration < this.minReadyDuration) {
       validDuration = this.minReadyDuration;
-
-    if (this.pug == null || !this.pug.isAdded(id)) {
-      return null;
     }
-    let temp: Player = this.pug.getPlayer(id);
-    temp.updateReady(validDuration);
-    this.context.channel.send(
-      `${temp.discordMember.displayName} will be ready for the next ${validDuration} minutes`
-    );
-  }
 
-  public queuePlayer(member: GuildMember): Promise<Message> {
-    //If a pug is on, just add as normal
-    if (this.pug != null) return this.addPlayer(member);
-
-    if (this.pugQueue.queuePlayer(new Player(member)))
-      return this.displayQueue();
-    else return this.context.channel.send("Already added to the queue.");
-  }
-
-  public dequeuePlayer(id: string): Promise<Message> {
-    if (this.pugQueue.removePlayerID(id)) return this.displayQueue();
-    else return this.context.channel.send("You were not added to the queue.");
-  }
-
-  public displayStatus(): Promise<Message> {
-    if (this.pug == null) {
-      this.context.channel.send("There is no pug in progress.");
-      return this.displayQueue();
+    if (this.pug && this.pug.isAdded(id)) {
+      const player: Player = this.pug.getPlayer(id);
+      player.updateReady(validDuration);
+      return message.channel.send(
+        `${player.discordMember.displayName} will be ready for the next ${validDuration} minutes.`
+      );
+    } else {
+      return message.channel.send(
+        `Can't ready ${message.member.displayName} as they are not in the PUG.`
+      );
     }
-    return this.displayReadyStatus();
   }
 
-  private clearInputRoles(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const role = this.context.guild.roles.cache.find(
+  public queuePlayer(message: Message): Promise<Message> {
+    if (this.pug) {
+      // Add the player directly to the PUG if one is already started
+      return this.addPlayer(message);
+    } else {
+      const player = new Player(message.member);
+      const isInQueue = this.pugQueue.getIsPlayerInQueue(player);
+      if (!isInQueue) {
+        this.pugQueue.queuePlayer(player);
+        return this.displayQueue(message);
+      } else {
+        return message.channel.send(
+          `${player.discordMember.displayName} is already in the queue.`
+        );
+      }
+    }
+  }
+
+  public dequeuePlayer(message: Message, id: string): Promise<Message> {
+    const player = new Player(message.member);
+    const isInQueue = this.pugQueue.getIsPlayerInQueue(player);
+
+    if (isInQueue) {
+      this.pugQueue.removePlayer(player);
+      return this.displayQueue(message);
+    } else {
+      return message.channel.send(
+        `${player.discordMember.displayName} was not removed from the queue as they are not in the queue.`
+      );
+    }
+  }
+
+  public displayStatus(message: Message): Promise<Message> {
+    if (this.pug) {
+      return this.displayReadyStatus(message);
+    } else {
+      message.channel.send("There is no PUG in progress.");
+      return this.displayQueue(message);
+    }
+  }
+
+  private clearInputRoles(message: Message): Promise<void> {
+    return new Promise((resolve) => {
+      const role = message.guild.roles.cache.find(
         (role) => role.name === "in-pug"
       );
-      const list = this.context.guild.members
-        .fetch()
-        .then((members) => {
-          members.forEach((m, s) => {
-            m.roles.remove(role);
+
+      if (!role) {
+        message.channel.send(`Error: could not find the in-pug role.`);
+        resolve();
+      } else {
+        message.guild.members
+          .fetch()
+          .then((members) => {
+            if (members) {
+              members.forEach((member) => {
+                member.roles.remove(role);
+              });
+            } else {
+              message.channel.send(`Error: could not get membership roles.`);
+            }
+            resolve();
+          })
+          .catch((e) => {
+            message.channel.send(`Error: could not get membership roles.`);
+            console.error(e);
+            resolve();
           });
-          resolve();
-        })
-        .catch(console.error);
+      }
     });
   }
 
   private checkAvailableServers(): Promise<TF2Server[]> {
-    let openServers: TF2Server[] = [];
+    const openServers: TF2Server[] = [];
     return new Promise(async (resolve, reject) => {
-      for (let s of this.serverList) {
-        await SSQuery.getPlayers(s.address, s.port)
+      for (const server of this.serverList) {
+        await SSQuery.getPlayers(server.address, server.port)
           .then((info) => {
-            if (info.length == 0) openServers.push(s);
+            if (info.length == 0) openServers.push(server);
           })
-          .catch(() => console.log("Error retrieving open servers"));
+          .catch(() => console.log("Error retrieving open servers."));
       }
       resolve(openServers);
     });
   }
 
   private sendConnectionDetails(server: TF2Server) {
-    let rcon: RconConnection = new RconConnection(
+    const rcon: RconConnection = new RconConnection(
       server.address,
       server.port,
       process.env.RCON_PASSWORD
@@ -337,127 +376,99 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
         });
         this.pug = null;
       })
-      .catch(() => {});
+      .catch((e) => console.error(e));
   }
 
-  //Method declarations for the IServer Interface
+  private getUnreadyMsg() {
+    const unreadyPlayers = this.pug.getUnreadyPlayers();
+    return `Unready players: ${unreadyPlayers
+      .map((p) => p.discordMember.displayName)
+      .join(", ")}`;
+  }
 
-  onServerFull(server: TF2Server) {
-    const role = this.context.guild.roles.cache.find(
+  onServerFull(message: Message, server: TF2Server) {
+    const role = message.guild.roles.cache.find(
       (role) => role.name === "in-pug"
     );
-    let readyMessage: Message;
-    let unreadyPlayers: Player[] = this.pug.getUnreadyPlayers();
 
-    if (unreadyPlayers.length == 0) {
-      this.context.channel
+    let reactMessage: Message;
+
+    const unreadyPlayers = this.pug.getUnreadyPlayers();
+    if (unreadyPlayers.length === 0) {
+      message.channel
         .send(
-          `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details`
+          `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details.`
         )
         .then(() => this.sendConnectionDetails(server));
     } else {
-      let reactMessage: Message;
-      this.context.channel
+      message.channel
         .send(
-          `<@&${role.id}> Your pickup game is full, react below to ready-up`
+          `<@&${role.id}> Your pickup game is full, react below to ready-up.`
         )
-        .then(
-          (message) =>
-            new Promise((resolve, reject) => {
-              message.react("👍");
-              reactMessage = message;
-
-              let unreadyOutput: string = "Unready Players: ";
-              unreadyPlayers.forEach((p) => {
-                unreadyOutput = unreadyOutput
-                  .concat(p.discordMember.displayName)
-                  .concat(",");
-              });
-              unreadyOutput.slice(0, -1);
-              resolve(unreadyOutput);
-            })
-        )
-        .then((unreadyOutput) => this.context.channel.send(unreadyOutput))
-        .then((message) => {
-          //message - the message sent to discord displaying the unready players, will be used to update dynamically
-          readyMessage = message;
-
+        .then((gameFullMsg) => {
+          reactMessage = gameFullMsg;
+          return gameFullMsg.react("👍");
+        })
+        .then(() => {
+          return message.channel.send(this.getUnreadyMsg());
+        })
+        .then((unreadyListMsg) => {
           this.checkReadyInterval = setInterval(() => {
-            //get list of all who have reacted
+            // Get a list of all who have reacted
             reactMessage.reactions
               .resolve("👍")
               .users.fetch()
-              .then(
-                (users) =>
-                  new Promise<void>((resolve, reject) => {
-                    users.forEach((u, k, m) => {
-                      let player: Player = this.pug.getPlayerID(u.id);
-                      if (player != null)
-                        player.updateReady(this.readyDuration);
-                    });
-                    resolve();
-                  })
-              )
-              .then(() => {
-                unreadyPlayers = this.pug.getUnreadyPlayers();
-
-                let unreadyOutput: string = "Unready Players: ";
-                unreadyPlayers.forEach((p) => {
-                  unreadyOutput = unreadyOutput
-                    .concat(p.discordMember.displayName)
-                    .concat(",");
+              .then((users) => {
+                users.forEach((user) => {
+                  const player = this.pug.getPlayerById(user.id);
+                  if (player) {
+                    player.updateReady(this.readyDuration);
+                  }
                 });
-                unreadyOutput.slice(0, -1);
-                readyMessage.edit(unreadyOutput);
 
-                if (unreadyPlayers.length == 0) {
+                unreadyListMsg.edit(this.getUnreadyMsg());
+
+                const unreadyPlayers = this.pug.getUnreadyPlayers();
+
+                if (unreadyPlayers.length === 0) {
                   clearTimeout(this.readyTimeout);
-                  clearTimeout(this.checkReadyInterval);
-                  console.log("after clear timeout");
-                  this.context.channel
+                  clearInterval(this.checkReadyInterval);
+                  unreadyListMsg.channel
                     .send(
-                      `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details`
+                      `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details.`
                     )
-                    .then(() => this.displayReadyStatus())
+                    .then(() => this.displayReadyStatus(message))
                     .then(() => this.sendConnectionDetails(server));
                 }
               });
           }, 1000);
 
           this.readyTimeout = setTimeout(() => {
-            let output: string = " ";
-            for (let i = 0; i < unreadyPlayers.length; i++) {
-              output = output
-                .concat(unreadyPlayers[i].discordMember.displayName)
-                .concat(", ");
-            }
-            output = output.slice(0, -2);
-            this.context.channel.send(
-              `The following players are not ready and have been removed from the pug: ${output}`
+            const unreadyPlayers = this.pug.getUnreadyPlayers();
+            unreadyListMsg.channel.send(
+              `The following players are not ready and have been removed: ${unreadyPlayers
+                .map((p) => p.discordMember.id)
+                .join(", ")}`
             );
             unreadyPlayers.forEach((player) => {
-              this.pug.removePlayer(player.discordMember.id);
+              this.pug.removePlayer(message, player.discordMember.id);
             });
-            this.displayReadyStatus();
+            this.displayReadyStatus(message);
           }, 1.2e5);
         })
         .catch(console.error);
     }
   }
 
-  onServerUnfull() {
-    this.context.channel.send(
-      "Pickup game no longer full, cancelling ready check."
-    );
+  onServerUnfull(message: Message) {
+    message.channel.send("Pickup game no longer full, cancelling ready check.");
     clearTimeout(this.readyTimeout);
-    clearTimeout(this.checkReadyInterval);
+    clearInterval(this.checkReadyInterval);
   }
 
-  //Method declarations for the IPug Interface
-
-  public onPugStop() {
+  public onPugStop(message: Message) {
     this.pug.addedPlayers.forEach((player) => {
-      const role = this.context.guild.roles.cache.find(
+      const role = message.guild.roles.cache.find(
         (role) => role.name === "in-pug"
       );
       player.discordMember.roles.remove(role);
@@ -465,15 +476,15 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     this.pug = null;
   }
 
-  public onPlayerAdded(player: Player) {
-    const role = this.context.guild.roles.cache.find(
+  public onPlayerAdded(message: Message, player: Player) {
+    const role = message.guild.roles.cache.find(
       (role) => role.name === "in-pug"
     );
     player.discordMember.roles.add(role);
   }
 
-  public onPlayerRemoved(player: Player) {
-    const role = this.context.guild.roles.cache.find(
+  public onPlayerRemoved(message: Message, player: Player) {
+    const role = message.guild.roles.cache.find(
       (role) => role.name === "in-pug"
     );
     player.discordMember.roles.remove(role);

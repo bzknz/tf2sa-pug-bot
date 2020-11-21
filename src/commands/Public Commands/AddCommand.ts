@@ -17,6 +17,6 @@ export default class AddCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.addPlayer(message.member); //Working as intended
+    return this.client.pugControl.addPlayer(message);
   }
 }

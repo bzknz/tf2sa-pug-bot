@@ -1,5 +1,3 @@
-// TODO: Split this into a more detailed OOP based system
-
 import { AkairoClient, CommandHandler, ListenerHandler } from "discord-akairo";
 import { Message } from "discord.js";
 import { join } from "path";

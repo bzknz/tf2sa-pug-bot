@@ -1,9 +1,8 @@
+import { Message } from "discord.js";
 import { Player } from "../models/Player";
 
 export interface IPug {
-  onPugStop();
-
-  onPlayerAdded(player: Player);
-
-  onPlayerRemoved(player: Player);
+  onPugStop(message: Message): void;
+  onPlayerAdded(message: Message, player: Player): void;
+  onPlayerRemoved(message: Message, player: Player): void;
 }

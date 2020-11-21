@@ -17,6 +17,6 @@ export default class AddCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.dequeuePlayer(message.member.id); //Working as intended
+    return this.client.pugControl.dequeuePlayer(message, message.member.id);
   }
 }

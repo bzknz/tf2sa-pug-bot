@@ -31,6 +31,6 @@ export default class KickCommand extends Command {
     message: Message,
     { member }: { member: string }
   ): Promise<Message> {
-    return this.client.pugControl.kickPlayer(member); //Need to double check
+    return this.client.pugControl.kickPlayer(message, member); //Need to double check
   }
 }

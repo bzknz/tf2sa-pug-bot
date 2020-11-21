@@ -17,6 +17,6 @@ export default class StatusCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.displayStatus();
+    return this.client.pugControl.displayStatus(message);
   }
 }

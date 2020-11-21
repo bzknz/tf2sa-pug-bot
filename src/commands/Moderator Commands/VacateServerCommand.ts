@@ -28,6 +28,6 @@ export default class ClearServerCommand extends Command {
     message: Message,
     { serverID }: { serverID: number }
   ): Promise<Message> {
-    return this.client.pugControl.vacateServer(serverID); //Working as intended
+    return this.client.pugControl.vacateServer(message, serverID);
   }
 }

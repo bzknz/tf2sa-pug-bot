@@ -1,3 +1,4 @@
+import { Message } from "discord.js";
 import { IPug } from "../interfaces/PugInterfaces";
 import { IServerFull, IServerUnfull } from "../interfaces/ServerInterfaces";
 import { Player } from "../models/Player";
@@ -34,7 +35,7 @@ export class Pug {
     this.readyPlayers = [];
   }
 
-  public addPlayer(player: Player): boolean {
+  public addPlayer(message: Message, player: Player): boolean {
     let added = false;
     this.addedPlayers.forEach((m) => {
       if (m.discordMember.id === player.discordMember.id) added = true;
@@ -42,40 +43,36 @@ export class Pug {
 
     if (!added) {
       this.addedPlayers.push(player);
-      this.pugListener.onPlayerAdded(player);
+      this.pugListener.onPlayerAdded(message, player);
       player.updateReady(this.readyDuration);
-      if (this.addedPlayers.length == this.maxPlayers) {
-        this.serverFull.onServerFull(this.server);
+      if (this.addedPlayers.length === this.maxPlayers) {
+        this.serverFull.onServerFull(message, this.server);
       }
       return true;
     }
     return false;
   }
 
-  public removePlayer(id: string): boolean {
+  public removePlayer(message: Message, id: string): boolean {
     let player: Player = null;
     this.addedPlayers.forEach((p) => {
       if (p.discordMember.id === id) player = p;
     });
 
-    if (player != null) {
+    if (player) {
       if (this.addedPlayers.length == this.maxPlayers) {
-        this.serverUnfull.onServerUnfull();
+        this.serverUnfull.onServerUnfull(message);
       }
-      this.addedPlayers = this.addedPlayers.filter(function (
-        value,
-        index,
-        arr
-      ) {
-        return value.discordMember.id != id;
-      });
-      this.pugListener.onPlayerRemoved(player);
+      this.addedPlayers = this.addedPlayers.filter(
+        (addedPlayer) => addedPlayer.discordMember.id != id
+      );
+      this.pugListener.onPlayerRemoved(message, player);
       return true;
     }
     return false;
   }
 
-  public removePlayerNoCallback(id: string) {
+  public removePlayerNoCallback(message: Message, id: string) {
     let addedPlayer: Player = null;
     this.addedPlayers.forEach((p) => {
       if (p.discordMember.id === id) addedPlayer = p;
@@ -89,13 +86,13 @@ export class Pug {
       ) {
         return value.discordMember.id != id;
       });
-      this.pugListener.onPlayerRemoved(addedPlayer);
+      this.pugListener.onPlayerRemoved(message, addedPlayer);
       return true;
     }
     return false;
   }
 
-  public removePlayerRegex(name: string): number {
+  public removePlayerRegex(message: Message, name: string): number {
     //0 - successfully kicked, 1 - no player found, 2 - multiple players match the name
     let contains: Player[] = [];
     this.addedPlayers.forEach((p) => {
@@ -105,18 +102,18 @@ export class Pug {
     if (contains.length === 0) return 1;
 
     if (contains.length === 1) {
-      this.removePlayer(contains[0].discordMember.id);
+      this.removePlayer(message, contains[0].discordMember.id);
       return 0;
     }
 
     return 2;
   }
 
-  public stop() {
+  public stop(message: Message) {
     if (this.addedPlayers.length == this.maxPlayers) {
-      this.serverUnfull.onServerUnfull();
+      this.serverUnfull.onServerUnfull(message);
     }
-    this.pugListener.onPugStop();
+    this.pugListener.onPugStop(message);
   }
 
   public getPlayer(id: string): Player {
@@ -127,7 +124,7 @@ export class Pug {
     return player;
   }
 
-  public getPlayerID(id: string): Player {
+  public getPlayerById(id: string): Player {
     let player: Player;
     this.addedPlayers.forEach((p) => {
       if (p.discordMember.id == id) player = p;

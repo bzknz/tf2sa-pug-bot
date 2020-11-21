@@ -28,6 +28,7 @@ export default class ReadyCommand extends Command {
     { duration }: { duration: number }
   ): Promise<Message> {
     return this.client.pugControl.readyPlayer(
+      message,
       message.member.id,
       Math.round(duration)
     );

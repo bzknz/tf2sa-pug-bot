@@ -2,69 +2,39 @@ import { Player } from "../models/Player";
 import { QueuedPlayer } from "../models/QueuedPlayer";
 
 export class PugQueue {
-  //TODO Figure out how the fuck to do nested classes for QueuedPlayer
-
   queue: QueuedPlayer[];
 
   constructor() {
     this.queue = [];
   }
 
-  public queuePlayer(player: Player): boolean {
-    let inQueue: boolean = false;
-    this.queue.forEach((p) => {
-      if (
-        p.player.discordMember.displayName == player.discordMember.displayName
-      )
-        inQueue = true;
-    });
-    if (inQueue) return false;
-    else {
-      this.queue.push(new QueuedPlayer(player));
-      return true;
-    }
+  public getIsPlayerInQueue(player: Player): boolean {
+    return this.queue.some(
+      (queuedPlayer) =>
+        queuedPlayer.player.discordMember.id === player.discordMember.id
+    );
   }
 
-  public removePlayer(player: Player): boolean {
-    let addedPlayer: QueuedPlayer = null;
-    this.queue.forEach((p) => {
-      if (p.player.discordMember === player.discordMember) addedPlayer = p;
-    });
-
-    if (addedPlayer != null) {
-      this.queue = this.queue.filter(function (value, index, arr) {
-        return value.player.discordMember != player.discordMember;
-      });
-      return true;
-    }
-    return false;
+  public queuePlayer(player: Player) {
+    this.queue.push(new QueuedPlayer(player));
   }
 
-  public removePlayerID(id: string): boolean {
-    let addedPlayer: QueuedPlayer = null;
-    this.queue.forEach((p) => {
-      if (p.player.discordMember.id === id) addedPlayer = p;
-    });
+  public removePlayer(player: Player) {
+    this.removePlayerById(player.discordMember.id);
+  }
 
-    if (addedPlayer != null) {
-      this.queue = this.queue.filter(function (value, index, arr) {
-        return value.player.discordMember.id != id;
-      });
-      return true;
-    }
-    return false;
+  public removePlayerById(id: string) {
+    this.queue = this.queue.filter(
+      (queuedPlayer) => queuedPlayer.player.discordMember.id !== id
+    );
   }
 
   public dequeue(): QueuedPlayer {
-    if (this.queue.length == 0) return null;
-    let temp: QueuedPlayer[] = [];
-    let player: QueuedPlayer;
-    for (let i = 1; i < this.queue.length; i++) {
-      temp.push(this.queue[i]);
+    if (this.queue.length > 0) {
+      return this.queue.shift();
+    } else {
+      return null;
     }
-    player = this.queue[0];
-    this.queue = temp;
-    return player;
   }
 
   public getLength(): number {
@@ -72,7 +42,10 @@ export class PugQueue {
   }
 
   public getPlayer(index: number): QueuedPlayer {
-    if (index > this.queue.length || index < 0) return null;
-    return this.queue[index];
+    if (index > this.queue.length || index < 0) {
+      return null;
+    } else {
+      return this.queue[index];
+    }
   }
 }

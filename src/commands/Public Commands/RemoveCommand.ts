@@ -17,6 +17,6 @@ export default class RemoveCommand extends Command {
   }
 
   public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.removePlayer(message.member.id);
+    return this.client.pugControl.removePlayer(message, message.member.id);
   }
 }
