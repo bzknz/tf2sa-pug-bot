@@ -225,7 +225,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   public changeMap(message: Message, map: string): Promise<Message> {
-    if (!this.pug == null) {
+    if (!this.pug) {
       return message.channel.send("There is no pug in progress.");
     }
 
