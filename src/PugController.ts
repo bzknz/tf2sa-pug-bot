@@ -6,6 +6,7 @@ import { IServerFull, IServerUnfull } from "./interfaces/ServerInterfaces";
 import { Player } from "./models/Player";
 import { Pug } from "./models/Pug";
 import { PugQueue } from "./models/PugQueue";
+import { QueuedPlayer } from "./models/QueuedPlayer";
 import { TF2Server } from "./models/TF2Server";
 import RconConnection from "./util/RconConnection";
 import { SSQuery } from "./util/SSQuery";
@@ -83,15 +84,19 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   public displayQueue(message: Message): Promise<Message> {
-    let output: string = "(";
-    for (let i = 0; i < this.pugQueue.getLength(); i++) {
-      output = output
-        .concat(this.pugQueue.getPlayer(i).player.discordMember.displayName)
-        .concat("), (");
+    const numQueued = this.pugQueue.getPlayers().length;
+    if (numQueued === 0) {
+      return message.channel.send(
+        "There are no players queued for the next PUG. Use `!q` to join the queue."
+      );
+    } else {
+      return message.channel.send(
+        `Queued players: (${numQueued}): ${this.pugQueue
+          .getPlayers()
+          .map((p) => p.player.discordMember.displayName)
+          .join(", ")}.`
+      );
     }
-    output = output.slice(0, -3);
-    let finalOutput: string = `\`\`\`\n Players in queue: [${output}] \`\`\``;
-    return message.channel.send(finalOutput);
   }
 
   public async startPug(message: Message) {
@@ -129,22 +134,31 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     );
 
     // Add players from the queue
-    const numPlayersToAdd =
+    const numPlayersToAddFromQueue =
       this.pugQueue.getLength() > this.maxPlayers
         ? this.maxPlayers
         : this.pugQueue.getLength();
 
-    for (let i = 0; i < numPlayersToAdd; i++) {
+    const playersAddedFromQueue: QueuedPlayer[] = [];
+    for (let i = 0; i < numPlayersToAddFromQueue; i++) {
       const queuedPlayer = this.pugQueue.dequeue();
       if (queuedPlayer.timeInQueue() < this.queueDuration) {
+        playersAddedFromQueue.push(queuedPlayer);
         this.pug.addPlayer(message, queuedPlayer.player);
       }
     }
 
-    if (numPlayersToAdd < this.maxPlayers) {
+    if (numPlayersToAddFromQueue < this.maxPlayers) {
       // The PUG did not instantly fill, so let users know it has started
       await this.notifySubscribers(message, "A new pug has been started.");
       await this.displayReadyStatus(message);
+    } else {
+      // This PUG is going to instantly fill
+      await message.channel.send(
+        `PUG filled instantly with members from the queue :exploding_head:\nMap: ${map}\nPlayers: ${playersAddedFromQueue
+          .map((p) => p.player.discordMember.displayName)
+          .join(", ")}`
+      );
     }
   }
 

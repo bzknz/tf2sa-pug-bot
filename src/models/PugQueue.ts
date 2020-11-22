@@ -41,6 +41,10 @@ export class PugQueue {
     return this.queue.length;
   }
 
+  public getPlayers(): QueuedPlayer[] {
+    return this.queue;
+  }
+
   public getPlayer(index: number): QueuedPlayer {
     if (index > this.queue.length || index < 0) {
       return null;
