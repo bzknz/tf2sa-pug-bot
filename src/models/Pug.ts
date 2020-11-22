@@ -36,12 +36,13 @@ export class Pug {
   }
 
   public addPlayer(message: Message, player: Player): boolean {
-    let added = false;
-    this.addedPlayers.forEach((m) => {
-      if (m.discordMember.id === player.discordMember.id) added = true;
-    });
+    const isInPug = this.addedPlayers.some(
+      (addedPlayer) => player.discordMember.id === addedPlayer.discordMember.id
+    );
 
-    if (!added) {
+    if (isInPug) {
+      return false;
+    } else {
       this.addedPlayers.push(player);
       this.pugListener.onPlayerAdded(message, player);
       player.updateReady(this.readyDuration);
@@ -50,7 +51,6 @@ export class Pug {
       }
       return true;
     }
-    return false;
   }
 
   public removePlayer(message: Message, id: string): boolean {

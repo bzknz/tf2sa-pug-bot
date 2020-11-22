@@ -17,7 +17,7 @@ export default class StartCommand extends Command {
     });
   }
 
-  public exec(message: Message): Promise<Message> {
-    return this.client.pugControl.startPug(message);
+  public async exec(message: Message) {
+    await this.client.pugControl.startPug(message);
   }
 }

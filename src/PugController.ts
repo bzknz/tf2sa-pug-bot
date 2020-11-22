@@ -1,3 +1,5 @@
+import { Collection, MessageEmbed } from "discord.js";
+import { GuildMember } from "discord.js";
 import { Message } from "discord.js";
 import { IPug } from "./interfaces/PugInterfaces";
 import { IServerFull, IServerUnfull } from "./interfaces/ServerInterfaces";
@@ -19,11 +21,11 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   readyTimeout: NodeJS.Timeout;
 
   maxPlayers = 12;
-  readyDuration = 15;
+  readyDuration = 10;
   queueDuration = 3.6e6; // 1 Hour maximum limit in queue
   minReadyDuration = 15;
   maxReadyDuration = 30;
-  rconPassword: string = process.env.RCON_PASSWORD;
+  rconPassword = process.env.RCON_PASSWORD;
 
   constructor() {
     this.loadServers();
@@ -62,23 +64,22 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   private displayReadyStatus(message: Message): Promise<Message> {
-    let output: string = "(";
-    let currentTime: number = new Date().getTime();
-    for (let i = 0; i < this.maxPlayers; i++) {
-      let currPlayer: Player = this.pug.addedPlayers[i];
-      if (currPlayer == null) output = output.concat("?").concat("), (");
-      else {
-        let readyString: string =
-          currentTime > currPlayer.readyUntilTime ? "<unready>" : "<ready>";
-        output = output
-          .concat(currPlayer.discordMember.displayName)
-          .concat(readyString)
-          .concat("), (");
-      }
-    }
-    output = output.slice(0, -3);
-    let finalOutput: string = `\`\`\`\n (${this.pug.currentMap}) [${this.pug.addedPlayers.length}/${this.maxPlayers}] Players: [${output}] \`\`\``;
-    return message.channel.send(finalOutput);
+    const currentTime: number = new Date().getTime();
+    const playersStr = this.pug.addedPlayers
+      .map(
+        (player) =>
+          `${player.discordMember.displayName} ${
+            currentTime > player.readyUntilTime
+              ? " :zzz:"
+              : " :ballot_box_with_check:"
+          }`
+      )
+      .join(", ");
+
+    const embed = new MessageEmbed().setDescription(`Map: ${this.pug.currentMap}
+    Players (${this.pug.addedPlayers.length}/${this.maxPlayers}): [${playersStr}]`);
+
+    return message.channel.send(embed);
   }
 
   public displayQueue(message: Message): Promise<Message> {
@@ -93,52 +94,58 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     return message.channel.send(finalOutput);
   }
 
-  public startPug(message: Message): Promise<Message> {
-    if (this.pug != null) {
+  public async startPug(message: Message) {
+    if (this.pug) {
       return message.channel.send("A PUG is already in progress.");
     }
 
-    this.clearInputRoles(message)
-      .then(() => this.checkAvailableServers())
-      .then(
-        (openServers) =>
-          new Promise((resolve, reject) => {
-            if (openServers.length == 0) reject();
-            else {
-              this.pug = new Pug(
-                openServers[0],
-                this.maxPlayers,
-                this.getRandomMap(),
-                this.readyDuration,
-                this,
-                this,
-                this
-              );
-              let iterations: number =
-                this.pugQueue.getLength() > this.maxPlayers
-                  ? this.maxPlayers
-                  : this.pugQueue.getLength();
-              for (let i = 0; i < iterations; i++) {
-                let queuedPlayer = this.pugQueue.dequeue();
-                if (queuedPlayer.timeInQueue() < this.queueDuration)
-                  this.pug.addPlayer(message, queuedPlayer.player);
-              }
-              resolve();
-            }
-          })
-      )
-      .then(() =>
-        this.notifySubscribers(message, "A new pug has been started.")
-      )
-      .then(() => {
-        return this.displayReadyStatus(message);
-      })
-      .catch((e) => {
-        console.error(e);
-        return message.channel.send(
-          "Cannot start a game, no open servers to use."
-        );
-      });
+    const clearStatus = await this.clearInputRoles(message);
+    if (!clearStatus) {
+      await message.channel.send(
+        "Error: could remove users from the in-pug role."
+      );
+      // Not a fatal error, don't return here.
+    }
+
+    const openServers = await this.checkAvailableServers();
+    if (openServers.length === 0) {
+      await message.channel.send(
+        "Cannot start a game, no open servers to use. Players need to leave the server or an admin needs to issue `!vacate` to kick them all."
+      );
+      return;
+    }
+
+    // Start the PUG
+    const map = this.getRandomMap();
+
+    this.pug = new Pug(
+      openServers[0],
+      this.maxPlayers,
+      map,
+      this.readyDuration,
+      this,
+      this,
+      this
+    );
+
+    // Add players from the queue
+    const numPlayersToAdd =
+      this.pugQueue.getLength() > this.maxPlayers
+        ? this.maxPlayers
+        : this.pugQueue.getLength();
+
+    for (let i = 0; i < numPlayersToAdd; i++) {
+      const queuedPlayer = this.pugQueue.dequeue();
+      if (queuedPlayer.timeInQueue() < this.queueDuration) {
+        this.pug.addPlayer(message, queuedPlayer.player);
+      }
+    }
+
+    if (numPlayersToAdd < this.maxPlayers) {
+      // The PUG did not instantly fill, so let users know it has started
+      await this.notifySubscribers(message, "A new pug has been started.");
+      await this.displayReadyStatus(message);
+    }
   }
 
   public stopPug(message: Message): Promise<Message> {
@@ -315,49 +322,58 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     }
   }
 
-  private clearInputRoles(message: Message): Promise<void> {
-    return new Promise((resolve) => {
-      const role = message.guild.roles.cache.find(
-        (role) => role.name === "in-pug"
-      );
+  private async clearInputRoles(message: Message): Promise<boolean> {
+    const role = message.guild.roles.cache.find(
+      (role) => role.name === "in-pug"
+    );
 
-      if (!role) {
-        message.channel.send(`Error: could not find the in-pug role.`);
-        resolve();
-      } else {
-        message.guild.members
-          .fetch()
-          .then((members) => {
-            if (members) {
-              members.forEach((member) => {
-                member.roles.remove(role);
-              });
-            } else {
-              message.channel.send(`Error: could not get membership roles.`);
-            }
-            resolve();
-          })
-          .catch((e) => {
-            message.channel.send(`Error: could not get membership roles.`);
-            console.error(e);
-            resolve();
-          });
+    if (!role) {
+      await message.channel.send(`Error: could not find the in-pug role.`);
+      return false;
+    }
+
+    let members: Collection<string, GuildMember>;
+    try {
+      members = await message.guild.members.fetch();
+    } catch (e) {
+      console.error(e);
+      await message.channel.send(`Error: could not a list of members.`);
+      return false;
+    }
+
+    if (members) {
+      for (const [, member] of members) {
+        try {
+          member.roles.remove(role);
+        } catch (e) {
+          console.error(e);
+          await message.channel.send(`Error: getting roles for a member.`);
+          return false;
+        }
       }
-    });
+    } else {
+      await message.channel.send(`Error: no members returned from the server.`);
+      return false;
+    }
+    return true;
   }
 
-  private checkAvailableServers(): Promise<TF2Server[]> {
+  private async checkAvailableServers(): Promise<TF2Server[]> {
     const openServers: TF2Server[] = [];
-    return new Promise(async (resolve, reject) => {
-      for (const server of this.serverList) {
-        await SSQuery.getPlayers(server.address, server.port)
-          .then((info) => {
-            if (info.length == 0) openServers.push(server);
-          })
-          .catch(() => console.log("Error retrieving open servers."));
+
+    for (const server of this.serverList) {
+      let serverInfo: any[];
+      try {
+        serverInfo = await SSQuery.getPlayers(server.address, server.port);
+      } catch (e) {
+        console.error(e);
       }
-      resolve(openServers);
-    });
+      if (serverInfo?.length === 0) {
+        openServers.push(server);
+      }
+    }
+
+    return openServers;
   }
 
   private sendConnectionDetails(server: TF2Server) {
