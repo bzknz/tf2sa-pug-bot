@@ -134,22 +134,35 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
       this
     );
 
-    // Add players from the queue
-    const numPlayersToAddFromQueue =
-      this.pugQueue.getLength() > this.maxPlayers
-        ? this.maxPlayers
-        : this.pugQueue.getLength();
-
     const playersAddedFromQueue: QueuedPlayer[] = [];
-    for (let i = 0; i < numPlayersToAddFromQueue; i++) {
-      const queuedPlayer = this.pugQueue.dequeue();
-      if (queuedPlayer.timeInQueue() < this.queueDuration) {
-        playersAddedFromQueue.push(queuedPlayer);
-        this.pug.addPlayer(message, queuedPlayer.player);
+    const playersIgnoredFromQueue: QueuedPlayer[] = [];
+    const queueLength = this.pugQueue.getLength();
+    for (let i = 0; i < queueLength; i++) {
+      if (playersAddedFromQueue.length === this.maxPlayers) {
+        // Added enough players from the queue to fill the PUG
+        break;
+      } else {
+        const queuedPlayer = this.pugQueue.dequeue();
+        if (queuedPlayer.timeInQueue() < this.queueDuration) {
+          playersAddedFromQueue.push(queuedPlayer);
+          this.pug.addPlayer(message, queuedPlayer.player);
+        } else {
+          playersIgnoredFromQueue.push(queuedPlayer);
+        }
       }
     }
 
-    if (numPlayersToAddFromQueue < this.maxPlayers) {
+    if (playersIgnoredFromQueue.length > 0) {
+      await message.channel.send(
+        `Ignored the following players from the queue as they have been in the queue for too long (> ${Math.round(
+          this.queueDuration / 60 / 1000
+        )} min): ${playersIgnoredFromQueue
+          .map((ignoredPlayer) => `<@${ignoredPlayer.player.discordMember.id}>`)
+          .join(", ")}.`
+      );
+    }
+
+    if (playersAddedFromQueue.length < this.maxPlayers) {
       // The PUG did not instantly fill, so let users know it has started
       await this.notifySubscribers(message, "A new PUG has been started.");
       await this.displayReadyStatus(message);
