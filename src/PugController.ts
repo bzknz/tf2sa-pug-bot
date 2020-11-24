@@ -11,6 +11,9 @@ import { TF2Server } from "./models/TF2Server";
 import RconConnection from "./util/RconConnection";
 import { SSQuery } from "./util/SSQuery";
 
+const NO_PUG_IN_PROGRESS_MSG =
+  "There is no PUG in progress. Use `!start` to start one or `!q` to queue for the next one.";
+
 export class PugController implements IServerFull, IServerUnfull, IPug {
   pug: Pug;
   pugQueue: PugQueue;
@@ -59,7 +62,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
       return message.channel.send(`<@&${role.id}> ${msg}`);
     } else {
       return message.channel.send(
-        `Error: could not find pug-notification role.`
+        "Error: could not find the `pug-notification` role."
       );
     }
   }
@@ -86,9 +89,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   public displayQueue(message: Message): Promise<Message> {
     const numQueued = this.pugQueue.getPlayers().length;
     if (numQueued === 0) {
-      return message.channel.send(
-        "There are no players queued for the next PUG. Use `!q` to join the queue."
-      );
+      return message.channel.send("The queue is empty.");
     } else {
       return message.channel.send(
         `Queued players: (${numQueued}): ${this.pugQueue
@@ -107,7 +108,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     const clearStatus = await this.clearInputRoles(message);
     if (!clearStatus) {
       await message.channel.send(
-        "Error: could remove users from the in-pug role."
+        "Error: could remove users from the `in-pug` role."
       );
       // Not a fatal error, don't return here.
     }
@@ -150,12 +151,12 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
 
     if (numPlayersToAddFromQueue < this.maxPlayers) {
       // The PUG did not instantly fill, so let users know it has started
-      await this.notifySubscribers(message, "A new pug has been started.");
+      await this.notifySubscribers(message, "A new PUG has been started.");
       await this.displayReadyStatus(message);
     } else {
       // This PUG is going to instantly fill
       await message.channel.send(
-        `PUG filled instantly with members from the queue :exploding_head:\nMap: ${map}\nPlayers: ${playersAddedFromQueue
+        `The PUG filled instantly with members from the queue :exploding_head:\nMap: ${map}\nPlayers: ${playersAddedFromQueue
           .map((p) => p.player.discordMember.displayName)
           .join(", ")}`
       );
@@ -163,42 +164,42 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
   }
 
   public stopPug(message: Message): Promise<Message> {
-    if (this.pug == null) {
-      return message.channel.send("There is no pug in progress");
+    if (!this.pug) {
+      return message.channel.send(NO_PUG_IN_PROGRESS_MSG);
     } else {
       this.pug.stop(message);
-      return message.channel.send("Stopped the pug.");
+      return message.channel.send("Stopped the PUG.");
     }
   }
 
   public addPlayer(message: Message): Promise<Message> {
     const member = message.member;
-    if (this.pug == null) {
-      return message.channel.send("There is no pug in progress.");
+    if (!this.pug) {
+      return message.channel.send(NO_PUG_IN_PROGRESS_MSG);
     } else if (this.pug.isFull()) {
       return message.channel.send(
-        "The pug is currently full, wait until a new one has been created."
+        "The PUG is currently full. Queue for the next one with `!q`."
       );
     } else if (this.pug.addPlayer(message, new Player(member))) {
       return this.displayReadyStatus(message);
     } else {
-      return message.channel.send("Already added to the pug.");
+      return message.channel.send("Already added to the PUG.");
     }
   }
 
   public removePlayer(message: Message, id: string): Promise<Message> {
-    if (this.pug == null) {
-      return message.channel.send("There is no pug in progress.");
+    if (!this.pug) {
+      return message.channel.send(NO_PUG_IN_PROGRESS_MSG);
     } else if (this.pug.removePlayer(message, id)) {
       return this.displayReadyStatus(message);
     } else {
-      return message.channel.send("You are not added to the pug.");
+      return message.channel.send("You are not added to the PUG.");
     }
   }
 
   public kickPlayer(message: Message, name: string): Promise<Message> {
     if (!this.pug == null) {
-      return message.channel.send("There is no pug in progress.");
+      return message.channel.send(NO_PUG_IN_PROGRESS_MSG);
     }
     switch (this.pug.removePlayerRegex(message, name)) {
       case 0:
@@ -226,7 +227,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
 
   public changeMap(message: Message, map: string): Promise<Message> {
     if (!this.pug) {
-      return message.channel.send("There is no pug in progress.");
+      return message.channel.send(NO_PUG_IN_PROGRESS_MSG);
     }
 
     const contains: string[] = [];
@@ -252,26 +253,30 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     return message.channel.send(output);
   }
 
-  public vacateServer(message: Message, serverID: number): Promise<Message> {
+  public async vacateServer(
+    message: Message,
+    serverID: number
+  ): Promise<Message> {
     const currServer = this.serverList[serverID];
-    if (currServer != null) {
+    if (currServer) {
       const rcon = new RconConnection(
         currServer.address,
         currServer.port,
         this.rconPassword
       );
-      rcon
-        .sendCommand("kickall")
-        .then(() => {
-          return message.channel.send("All players kicked from the server.");
-        })
-        .catch(() => {
-          return message.channel.send(
-            "Unable to kick players from the server."
-          );
-        });
+      try {
+        await rcon.sendCommand("kickall");
+      } catch (e) {
+        console.error(e);
+        return message.channel.send(
+          "Unable to kick players from the server. Is the server down?"
+        );
+      }
+      return message.channel.send("All players kicked from the server.");
     } else {
-      return message.channel.send("No server found matching that ID.");
+      return message.channel.send(
+        "No server found at that index in the array of servers."
+      );
     }
   }
 
@@ -331,7 +336,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     if (this.pug) {
       return this.displayReadyStatus(message);
     } else {
-      message.channel.send("There is no PUG in progress.");
+      message.channel.send(NO_PUG_IN_PROGRESS_MSG);
       return this.displayQueue(message);
     }
   }
@@ -342,7 +347,7 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     );
 
     if (!role) {
-      await message.channel.send(`Error: could not find the in-pug role.`);
+      await message.channel.send("Error: could not find the `in-pug` role.");
       return false;
     }
 
@@ -411,8 +416,11 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
 
   private getUnreadyMsg() {
     const unreadyPlayers = this.pug.getUnreadyPlayers();
+    if (unreadyPlayers.length === 0) {
+      return "Everyone is ready!";
+    }
     return `Unready players: ${unreadyPlayers
-      .map((p) => p.discordMember.displayName)
+      .map((p) => `<@${p.discordMember.id}>`)
       .join(", ")}`;
   }
 
@@ -420,20 +428,19 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
     const role = message.guild.roles.cache.find(
       (role) => role.name === "in-pug"
     );
-
-    let reactMessage: Message;
-
+    const allReadyMsg = `:fireworks: The PUG is full and everyone is ready. Sending connection details via DM.`;
     const unreadyPlayers = this.pug.getUnreadyPlayers();
     if (unreadyPlayers.length === 0) {
+      // Everyone is ready
       message.channel
-        .send(
-          `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details.`
-        )
+        .send(`<@&${role.id}> ${allReadyMsg}`)
         .then(() => this.sendConnectionDetails(server));
     } else {
+      // Ask players to ready up
+      let reactMessage: Message;
       message.channel
         .send(
-          `<@&${role.id}> Your pickup game is full, react below to ready-up.`
+          `<@&${role.id}> The PUG is full. React below (click the thumb) to ready-up.`
         )
         .then((gameFullMsg) => {
           reactMessage = gameFullMsg;
@@ -457,16 +464,13 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
                 });
 
                 unreadyListMsg.edit(this.getUnreadyMsg());
-
                 const unreadyPlayers = this.pug.getUnreadyPlayers();
 
                 if (unreadyPlayers.length === 0) {
                   clearTimeout(this.readyTimeout);
                   clearInterval(this.checkReadyInterval);
                   unreadyListMsg.channel
-                    .send(
-                      `<@&${role.id}> Your pickup game is full, everyone is ready. Sending connection details.`
-                    )
+                    .send(`<@&${role.id}> ${allReadyMsg}`)
                     .then(() => this.displayReadyStatus(message))
                     .then(() => this.sendConnectionDetails(server));
                 }
@@ -475,23 +479,26 @@ export class PugController implements IServerFull, IServerUnfull, IPug {
 
           this.readyTimeout = setTimeout(() => {
             const unreadyPlayers = this.pug.getUnreadyPlayers();
-            unreadyListMsg.channel.send(
-              `The following players are not ready and have been removed: ${unreadyPlayers
-                .map((p) => p.discordMember.id)
-                .join(", ")}`
-            );
             unreadyPlayers.forEach((player) => {
               this.pug.removePlayer(message, player.discordMember.id);
             });
+            unreadyListMsg.channel.send(
+              `The following players did not ready up in time and have been removed: ${unreadyPlayers
+                .map((p) => `<@${p.discordMember.id}>`)
+                .join(", ")}`
+            );
             this.displayReadyStatus(message);
           }, 1.2e5);
         })
-        .catch(console.error);
+        .catch((e) => {
+          console.error(e);
+          message.channel.send("Something went wrong. :(");
+        });
     }
   }
 
   onServerUnfull(message: Message) {
-    message.channel.send("Pickup game no longer full, cancelling ready check.");
+    message.channel.send("The PUG is no longer full, cancelling ready check.");
     clearTimeout(this.readyTimeout);
     clearInterval(this.checkReadyInterval);
   }

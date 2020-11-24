@@ -11,23 +11,14 @@ export default class RconConnection {
     this.password = password;
   }
 
-  sendCommand(comm: String): Promise<void> {
+  async sendCommand(command: String): Promise<void> {
     const server = new Rcon({ host: this.address, port: this.port });
-    return new Promise((resolve, reject) => {
-      server
-        .authenticate(this.password)
-        .then(() => {
-          console.log("authenticated");
-          server.execute(comm);
-        })
-        .then(() => {
-          console.log(`Successfully executed command: ${comm}`);
-          resolve();
-        })
-        .catch((e) => {
-          console.error(e);
-          reject();
-        });
-    });
+
+    const authResponse = await server.authenticate(this.password);
+    console.log("authenticated");
+
+    console.log(`executing: ${command}`);
+    // Cannot await this as the promise does not seem to resolve (bug in the library?)
+    server.execute(command);
   }
 }
